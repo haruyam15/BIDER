@@ -1,0 +1,67 @@
+name: Sync upstream deploy -> my deploy
+
+on:
+  workflow_dispatch: {} # 수동 실행
+  schedule:
+    - cron: '0 * * * *' # 매시 정각(UTC) = KST +9h
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout my repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream and fetch
+        run: |
+          git remote add upstream https://github.com/KFE-E2E-SAJO/BIDER.git || true
+          git fetch upstream deploy
+
+      - name: Update local deploy from upstream/deploy (keep my .github)
+        run: |
+          # 1) deploy 체크아웃
+          git checkout deploy || git checkout -b deploy
+
+          # 2) 내 .github 임시 백업 (현재 워킹트리의 내 레포 상태)
+          rm -rf /tmp/mydotgithub
+          mkdir -p /tmp/mydotgithub
+          if [ -d ".github" ]; then
+            cp -a .github /tmp/mydotgithub/
+          fi
+
+          # 3) 업스트림으로 동기화 (FF 가능하면 FF, 아니면 하드 리셋)
+          if git merge --ff-only upstream/deploy; then
+            echo "Fast-forward merged."
+          else
+            git reset --hard upstream/deploy
+          fi
+
+          # 4) 임시 백업에서 .github 복원 (origin 내용과 무관하게 항상 내 버전 유지)
+          if [ -d "/tmp/mydotgithub/.github" ]; then
+            rm -rf .github
+            cp -a /tmp/mydotgithub/.github .github
+          fi
+
+          # 5) 변경이 있으면 커밋
+          if ! git diff --quiet -- .github; then
+            git add .github
+            git commit -m "Keep my .github directory"
+          fi
+
+      - name: Push to my deploy (with PAT)
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git remote set-url origin https://x-access-token:${GH_PAT}@github.com/haruyam15/BIDER.git
+          git push origin deploy --force-with-lease

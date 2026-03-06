@@ -29,6 +29,7 @@ jobs:
     name: Auto Release
     runs-on: ubuntu-latest
     if: >-
+      github.repository == 'KFE-E2E-SAJO/BIDER' &&
       !contains(github.event.head_commit.message, 'skip-release') &&
       !contains(github.event.head_commit.message, 'chore: bump version')
 
