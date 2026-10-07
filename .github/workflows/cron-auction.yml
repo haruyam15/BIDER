@@ -7,6 +7,7 @@ on:
 
 jobs:
   create-auctions:
+    if: github.repository == 'KFE-E2E-SAJO/BIDER'
     runs-on: ubuntu-latest
     steps:
       - name: Call auction creation endpoint
